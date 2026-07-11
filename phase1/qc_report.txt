@@ -1,0 +1,6 @@
+stars: 1013200 from 34 shards
+err@500Myr: median 17.2 pc, p95 194 pc, max 107122 pc
+bad fraction (>200 pc): 4.85%
+good-set err@500Myr: median 16.2 pc, p95 86 pc
+window-median error: median 13.5 pc
+energy drift dE/E: median 3.1e-11, max 4.7e-07

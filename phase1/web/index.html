@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orrery: a million real stars, rewound half a billion years</title>
+<style>
+  :root { --fg: #cfd4dc; --dim: #8b93a1; --line: #2a2f3a; --accent: #e8b34b; }
+  html, body { margin: 0; height: 100%; background: #000; color: var(--fg);
+    font: 13px/1.5 system-ui, sans-serif; overflow: hidden; }
+  #gpu { position: fixed; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+  .panel { background: rgba(10, 12, 16, .82); border: 1px solid var(--line);
+    border-radius: 8px; backdrop-filter: blur(6px); }
+
+  #hud { position: fixed; left: 12px; top: 12px; padding: 10px 14px; max-width: 330px; }
+  #hud h1 { font-size: 15px; margin: 0 0 2px; color: #fff; font-weight: 650; }
+  #hud .sub { color: var(--dim); font-size: 12px; }
+  #load { margin-top: 6px; font-size: 12px; color: var(--dim); }
+  #load b { color: var(--fg); font-variant-numeric: tabular-nums; }
+  #devnote { margin-top: 6px; font-size: 11px; color: #d9a441; display: none; }
+
+  #controls { position: fixed; right: 12px; top: 12px; padding: 10px 12px;
+    display: flex; flex-direction: column; gap: 8px; min-width: 210px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .row label { color: var(--dim); font-size: 12px; }
+  button, select { background: #1a1e26; color: var(--fg); border: 1px solid #333a46;
+    border-radius: 5px; padding: 4px 9px; font: inherit; cursor: pointer; }
+  button.on { border-color: var(--accent); color: var(--accent); }
+  input[type=range] { accent-color: var(--accent); width: 110px; }
+
+  #bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 14px 12px;
+    background: linear-gradient(transparent, rgba(0,0,0,.88) 35%);
+    display: flex; gap: 12px; align-items: center; }
+  #tslider { flex: 1; }
+  #tval { min-width: 150px; text-align: right; font-variant-numeric: tabular-nums;
+    color: #fff; }
+  #tval small { color: var(--dim); display: block; font-size: 11px; }
+
+  #dossier { position: fixed; left: 12px; top: 150px; width: 300px; padding: 12px 14px;
+    display: none; }
+  #dossier h2 { font-size: 13px; margin: 0 0 6px; color: var(--accent);
+    font-weight: 600; overflow-wrap: anywhere; }
+  #dossier table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  #dossier td { padding: 2px 0; }
+  #dossier td:last-child { text-align: right; color: #fff;
+    font-variant-numeric: tabular-nums; }
+  #dossier .warn { color: #d9a441; font-size: 11px; margin-top: 6px; }
+  #dossier a { color: var(--accent); }
+  #dclose { position: absolute; right: 8px; top: 6px; background: none;
+    border: none; color: var(--dim); font-size: 14px; }
+
+  #honesty { position: fixed; left: 12px; bottom: 56px; max-width: 430px;
+    font-size: 11.5px; color: var(--dim); }
+  #honesty summary { cursor: pointer; color: var(--fg); font-size: 12px;
+    padding: 6px 10px; }
+  #honesty[open] { background: rgba(10,12,16,.9); border: 1px solid var(--line);
+    border-radius: 8px; }
+  #honesty div { padding: 0 12px 10px; }
+
+  #backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .55);
+    display: none; z-index: 20; }
+  #about { position: fixed; z-index: 21; left: 50%; top: 50%;
+    transform: translate(-50%, -50%); width: min(560px, 92vw); max-height: 84vh;
+    overflow: auto; padding: 20px 24px 24px; display: none; }
+  #about h2 { margin: 0 0 2px; font-size: 17px; color: #fff; font-weight: 650; }
+  #about h3 { margin: 15px 0 3px; font-size: 11px; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--accent); }
+  #about p { margin: 0 0 4px; }
+  #about a { color: var(--accent); }
+  #about .by { color: #fff; font-size: 14px; }
+  #about .muted { color: var(--dim); font-size: 12px; margin-top: 2px; }
+  #about .close { position: absolute; right: 12px; top: 9px; background: none;
+    border: none; color: var(--dim); font-size: 18px; cursor: pointer; }
+  #err { position: fixed; inset: 0; display: none; place-items: center;
+    background: #000; color: var(--fg); text-align: center; padding: 20px; }
+</style>
+</head>
+<body>
+<canvas id="gpu"></canvas>
+
+<div id="hud" class="panel">
+  <h1>Orrery</h1>
+  <div class="sub">Real Gaia DR3 stars with full 3D positions and velocities,
+    their orbits precomputed, replayed by your GPU. Click any star.</div>
+  <div id="load">loading manifest...</div>
+  <div id="devnote">Development data: Phase 0 sample (46k stars). The 1M-star
+    run replaces these shards with no code change.</div>
+</div>
+
+<div id="controls" class="panel">
+  <div class="row"><label>colour</label>
+    <select id="cmode">
+      <option value="0" selected>star colour (BP-RP)</option>
+      <option value="1">kinematics (v&#966; &#8722; v&#7580;)</option>
+    </select></div>
+  <div class="row"><label>exposure</label>
+    <input id="expo" type="range" min="-2" max="2" step="0.05" value="0"></div>
+  <div class="row"><label>ride with the Sun</label>
+    <button id="comove">off</button></div>
+  <div class="row"><label>markers</label>
+    <button id="marks" class="on">on</button></div>
+  <div class="row"><label>info</label>
+    <button id="about-open">about &amp; credits</button></div>
+</div>
+
+<div id="dossier" class="panel">
+  <button id="dclose">x</button>
+  <h2 id="dtitle">Gaia DR3 ...</h2>
+  <table>
+    <tr><td>G magnitude</td><td id="dg"></td></tr>
+    <tr><td>colour BP-RP</td><td id="dbprp"></td></tr>
+    <tr><td>distance from Sun (now)</td><td id="ddist"></td></tr>
+    <tr><td>guiding radius</td><td id="drg"></td></tr>
+    <tr><td>orbital period</td><td id="dper"></td></tr>
+    <tr><td>radial swing</td><td id="dramp"></td></tr>
+    <tr><td>vertical swing</td><td id="dzamp"></td></tr>
+    <tr><td>v&#966; &#8722; v&#7580;(R&#8467;)</td><td id="ddv"></td></tr>
+    <tr><td>fit error at 500 Myr</td><td id="derr"></td></tr>
+  </table>
+  <div class="warn" id="dwarn"></div>
+  <div style="margin-top:6px"><a id="dlink" target="_blank" rel="noopener">
+    open in the Gaia archive</a></div>
+</div>
+
+<details id="honesty">
+  <summary>What is real here, and what is a model</summary>
+  <div>Every point is a real star measured by ESA's Gaia mission (DR3), one of
+  <b id="hcount">16,673,098</b> with full 3D position and velocity passing
+  quality cuts. The motion is a model: each star's orbit was computed as a
+  test particle in a fixed, smooth model of the Galaxy's gravity
+  (MilkyWayPotential2022), then compressed to a short quasi-periodic series
+  evaluated live on your GPU. The real Galaxy has a bar, spiral arms, gas
+  clouds, and stars that pull on each other; this model does not. It is a
+  planetarium-grade reconstruction, not a live or self-gravitating simulation.
+  Ensemble motion is trustworthy; any single star's position half a billion
+  years away is an estimate (median error <span id="hmed"></span> pc at
+  500 Myr, and <span id="hbad"></span> of stars fit worse than 200 pc, marked
+  in their dossier). The stars shown are the bright subset Gaia can fully
+  measure, mostly within a few thousand light-years of the Sun. You are
+  watching the Sun's neighbourhood shear and phase-mix, not tidal streams
+  forming.</div>
+</details>
+
+<div id="bar">
+  <button id="play">Play</button>
+  <select id="speed">
+    <option value="25">25 Myr/s</option>
+    <option value="100" selected>100 Myr/s</option>
+    <option value="400">400 Myr/s</option>
+  </select>
+  <input id="tslider" type="range" min="-500" max="500" step="0.25" value="0">
+  <div id="tval">t = 0 Myr<small id="gyr">0.00 galactic years</small></div>
+</div>
+
+<div id="backdrop"></div>
+<div id="about" class="panel">
+  <button class="close" id="about-close">&times;</button>
+  <h2>About Orrery</h2>
+  <p class="muted">An orrery of the Milky Way: real stars, their orbits computed
+    on a supercomputer, replayed in your browser across half a billion years.</p>
+
+  <h3>Developed by</h3>
+  <p class="by">Safeer Ali Mirani</p>
+  <p class="muted">GPU / XR engineer and computational neuroscientist.</p>
+  <p class="muted"><a href="mailto:safeer.ali.mirani@gmail.com">safeer.ali.mirani@gmail.com</a>
+    &middot; <a href="https://www.linkedin.com/in/safeeralimirani/" target="_blank"
+    rel="noopener">LinkedIn</a>
+    &middot; <a href="https://github.com/SafeerAliMirani" target="_blank"
+    rel="noopener">github.com/SafeerAliMirani</a></p>
+
+  <h3>The data</h3>
+  <p>Every point is a real star from ESA's <b>Gaia</b> mission, Data Release 3
+    (June 2022). Orrery shows <b id="a-shown"></b> of them, a uniform random
+    sample of the <b id="a-full"></b> stars with full six-dimensional phase
+    space (3D position and 3D velocity) that pass quality cuts: parallax
+    signal-to-noise &ge; 10, RUWE &lt; 1.4, radial-velocity error &lt; 5 km/s.
+    Distances come from inverted parallaxes; positions and velocities are
+    transformed into a Galactocentric frame (R&#8320; = 8.122 kpc). This is the
+    bright subset Gaia can fully measure, mostly within a few thousand
+    light-years of the Sun.</p>
+
+  <h3>The method</h3>
+  <p>Each orbit was integrated &plusmn;1 billion years as a test particle in a
+    fixed, smooth model of the Galaxy's gravity (gala's MilkyWayPotential2022)
+    on the <b>CINECA Galileo100</b> supercomputer, as a 34-task compute array.
+    Each orbit was then compressed to a short quasi-periodic (NAFF-style) series
+    of about a dozen terms &mdash; roughly 112 bytes per star &mdash; and that
+    series is evaluated live on your GPU every frame. Clicking a star
+    re-evaluates the same series at 512 epochs to draw its orbit ribbon.</p>
+
+  <h3>Accuracy and honesty</h3>
+  <p>Reconstruction error is a median of <b id="a-err"></b> parsecs at 500 Myr;
+    <b id="a-bad"></b> of orbits (hot or near-resonant stars) are not well
+    described by a short series and are flagged in their dossier. The model has
+    no bar, spiral arms, gas clouds, or self-gravity, so the motion is
+    planetarium-grade, not a live simulation. Ensemble motion is trustworthy;
+    any single star's deep-time position is an estimate. This shows the Sun's
+    neighbourhood shearing and phase-mixing, not tidal streams forming.</p>
+
+  <h3>Built with</h3>
+  <p>Raw WebGPU / WGSL, no libraries or frameworks. Orbit integration and
+    fitting in Python (gala, astropy, numpy).</p>
+
+  <h3>Credits</h3>
+  <p class="muted">Gaia data: ESA / Gaia / DPAC, pulled via the Leibniz-Institut
+    (AIP) TAP mirror. Compute: CINECA (project EIRI_E_UNISA2).
+    <a href="https://www.cosmos.esa.int/web/gaia/dr3" target="_blank"
+    rel="noopener">Gaia DR3</a> &middot;
+    <a href="https://gala.adrian.pw" target="_blank" rel="noopener">gala</a></p>
+</div>
+
+<div id="err" class="panel"><div>
+  <h2>WebGPU is not available</h2>
+  <p id="errmsg">This piece needs a browser with WebGPU (Chrome or Edge 113+,
+  recent Firefox or Safari).</p>
+</div></div>
+
+<script src="main.js?v=2"></script>
+</body>
+</html>

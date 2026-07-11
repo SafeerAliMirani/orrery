@@ -1,0 +1,29 @@
+# Large generated data. The 1M-star shards are hosted on Cloudflare Pages and
+# are fully regenerable from the pipeline in phase1/hpc/. Keeping them out of
+# git keeps the repo light; see phase1/README.md for how to rebuild them.
+phase1/web/shards/
+phase1/_dev_shards_46k/
+phase0/web/shards_dev46k/
+
+# Raw pulls, integrated trajectories, packed binaries (regenerable)
+phase0/data/*.csv
+phase0/data/*.bin
+phase0/data/*.h5
+**/*.h5
+web_shards.tgz
+*.tgz
+
+# Wrangler local cache (account info, deploy state)
+**/.wrangler/
+
+# Working notes, not part of the repo
+PORTFOLIO.md
+PROJECT_BRIEF.md
+phase1/hpc/RUN.md
+phase0/data/joburl.txt
+
+# Python / OS cruft
+**/__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
