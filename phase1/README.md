@@ -43,11 +43,12 @@ u32 f16 amp | f16 phase << 16); lines 0-3 R, 4-7 z, 8-10 phi, 11 pad),
 (i64 source_id). The manifest carries vc(R) LUT and the Sun series so the
 app has no hardcoded model numbers.
 
-## Remaining before launch
+## Status
 
-Run the HPC kit and swap shards in; host shards on free-egress storage
-(Cloudflare R2 or GitHub Releases) with the app on Netlify; a pass of
-visual tuning at 1M (sprite size, exposure defaults, maybe half-res HDR);
-mobile/touch input; then the portfolio page with the Windfield contrast
-(precomputed random-access time vs live integration, named clickable stars
-vs anonymous trails).
+Live at https://orrery-dua.pages.dev. The app and all 1M-star shards are
+served same-origin from Cloudflare Pages, so there is no separate data host
+and no CORS to configure.
+
+Remaining: visual tuning at 1M (sprite size, exposure defaults, maybe a
+half-res HDR target), mobile and touch input, and the DR4 rerun when it
+lands in December 2026.
