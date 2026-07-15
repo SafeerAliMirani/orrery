@@ -289,6 +289,15 @@ let camBasis = null, curProj = null, curMvp = null;
 
 const $ = id => document.getElementById(id);
 
+// analytics: one hit per label per session, kept in memory
+const trackFired = new Set();
+function trackOnce(type, label) {
+  const k = type + "/" + label;
+  if (trackFired.has(k)) return;
+  trackFired.add(k);
+  if (window.track) window.track(type, label);
+}
+
 /* ---------------- data loading ---------------- */
 
 async function loadManifest() {
@@ -537,6 +546,7 @@ function starPos(i, tt) {
 function showDossier(i) {
   picked = i;
   ribbonValid = false;
+  trackOnce("demo_interaction", "picked-star");
   const b = i * 28;
   const Rg = paramsCPU[b], Om = paramsCPU[b + 2];
   let rAmp = 0, zAmp = 0;
@@ -717,7 +727,10 @@ function wireInput() {
     playing = !playing;
     $("play").textContent = playing ? "Pause" : "Play";
   };
-  $("tslider").oninput = () => { t = parseFloat($("tslider").value); };
+  $("tslider").oninput = () => {
+    t = parseFloat($("tslider").value);
+    trackOnce("demo_interaction", "scrubbed-timeline");
+  };
   $("cmode").onchange = () => { cmode = parseInt($("cmode").value, 10); };
   $("comove").onclick = toggleComove;
   $("marks").onclick = () => {
@@ -750,11 +763,16 @@ function toggleComove() {
 
 async function main() {
   canvas = $("gpu");
-  if (!navigator.gpu) { $("err").style.display = "grid"; return; }
+  if (!navigator.gpu) {
+    $("err").style.display = "grid";
+    trackOnce("webgpu_unsupported", "no-webgpu");
+    return;
+  }
   const adapter = await navigator.gpu.requestAdapter();
   if (!adapter) {
     $("err").style.display = "grid";
     $("errmsg").textContent = "No GPU adapter found.";
+    trackOnce("webgpu_unsupported", "no-adapter");
     return;
   }
   device = await adapter.requestDevice();

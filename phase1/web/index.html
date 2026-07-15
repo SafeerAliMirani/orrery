@@ -215,6 +215,38 @@
   recent Firefox or Safari).</p>
 </div></div>
 
-<script src="main.js?v=2"></script>
+<script>
+(function(){
+  var ENDPOINT = 'https://safeer-analytics.safeer-ali-mirani.workers.dev/collect';
+
+  function send(type, label){
+    try {
+      var body = JSON.stringify({
+        type: type,
+        label: label || null,
+        path: location.pathname,
+        referrer: document.referrer || null
+      });
+      if (navigator.sendBeacon) navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'application/json' }));
+      else fetch(ENDPOINT, { method:'POST', body: body, headers:{'Content-Type':'application/json'}, keepalive: true });
+    } catch (_) {}
+  }
+
+  send('pageview');
+
+  document.addEventListener('click', function(e){
+    var a = e.target.closest ? e.target.closest('a') : null;
+    if (!a) return;
+    var href = a.getAttribute('href') || '';
+    if (/^https?:\/\//.test(href) && href.indexOf(location.host) === -1) {
+      var host = (href.match(/https?:\/\/([^\/]+)/) || [])[1] || 'link';
+      send('outbound_click', host);
+    }
+  }, true);
+
+  window.track = send;
+})();
+</script>
+<script src="main.js?v=3"></script>
 </body>
 </html>
