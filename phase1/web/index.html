@@ -227,8 +227,11 @@
         path: location.pathname,
         referrer: document.referrer || null
       });
-      if (navigator.sendBeacon) navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'application/json' }));
-      else fetch(ENDPOINT, { method:'POST', body: body, headers:{'Content-Type':'application/json'}, keepalive: true });
+      // text/plain is REQUIRED: application/json is not CORS-safelisted, so the browser
+      // needs a preflight, drops the beacon SILENTLY, and sendBeacon still returns true.
+      // The Worker parses the body as JSON regardless of the declared type.
+      if (navigator.sendBeacon) navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'text/plain;charset=UTF-8' }));
+      else fetch(ENDPOINT, { method:'POST', body: body, headers:{'Content-Type':'text/plain;charset=UTF-8'}, keepalive: true });
     } catch (_) {}
   }
 
@@ -248,5 +251,38 @@
 })();
 </script>
 <script src="main.js?v=3"></script>
+<!-- tour: steps for this page, then the shared engine -->
+<script>
+window.TOUR_STEPS = [
+  {
+    "sel": "#hud",
+    "title": "What you are looking at",
+    "body": "A million real stars measured by ESA Gaia, each one where it actually is. Scrub time and they move along the orbits they are really on."
+  },
+  {
+    "sel": "#cmode",
+    "title": "How the stars are coloured",
+    "body": "By their real colour, or by how they move. Both come from the measurements, neither is decoration."
+  },
+  {
+    "sel": "#expo",
+    "title": "Brightness",
+    "body": "The faint stars outnumber the bright ones by a long way. Turn this up to see the crowd, down to see the landmarks."
+  },
+  {
+    "sel": "#comove",
+    "title": "Ride with the Sun",
+    "body": "Off, you watch the galaxy turn from outside. On, you sit with the Sun and everything else moves around you."
+  },
+  {
+    "sel": "#about-open",
+    "title": "Where it all comes from",
+    "body": "The catalogue, the supercomputer the orbits were integrated on, the error at 500 million years, and who built this."
+  }
+];
+window.TOUR_OPTIONS = { readySel: "#hud" };
+</script>
+<script src="tour.js"></script>
+<!-- /tour -->
 </body>
 </html>
